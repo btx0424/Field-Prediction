@@ -4,6 +4,8 @@ model:
   latent_dim: 256
   out_dim: 3
 data:
+  prepare: False
+  generate_from: ''
   data_dir: './data/npy'
   batch_size: 32
 training:
