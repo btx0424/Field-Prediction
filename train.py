@@ -25,11 +25,18 @@ class MeshBaseline(pl.LightningModule):
         geo_dim     = kwargs.get('geo_dim', 2)
         param_dim   = kwargs.get('param_dim', 2)
         latent_dim  = kwargs.get('latent_dim', 32)
+        out_dim     = kwargs.get('out_dim', 3)
 
         self.encoder_geo    = CNNEncoder(geo_dim, latent_dim)
         self.encoder_param  = MLPEncoder(param_dim, latent_dim*2)
         self.cNorm          = ConditionalNorm(latent_dim)
-        self.decoder        = CNNDecoder(in_channels=latent_dim, out_channels=kwargs.get('out_dim'),)
+        self.res            = nn.Sequential(
+            ResNeXt(latent_dim, 16),
+            ResNeXt(latent_dim, 16),
+        )
+        self.decoder        = CNNDecoder(
+            method = 'PixelShuffle', groups=4,
+            in_channels=latent_dim, out_channels=out_dim,)
         
         self.lr = 1e-3
 
@@ -41,7 +48,7 @@ class MeshBaseline(pl.LightningModule):
 
         zx = self.encoder_geo(F.instance_norm(x))
         zp = self.encoder_param(c).view(c.size()[0], -1, 2)
-        out = self.decoder(self.cNorm(zx, zp))
+        out = self.decoder(self.res(self.cNorm(zx, zp)))
 
         # inverse_transform
         out = transforms.functional.resize(out, size)
@@ -80,32 +87,25 @@ class MeshBaseline(pl.LightningModule):
 
 if __name__=='__main__':
     data_cfg = {
-        'data_dir': './data/official/npy'
+        'data_dir': './data/npy',
+        'batch_size': 32,
     }
     data_module = StructuredModule(**data_cfg)
 
     model_cfg = {
         'geo_dim': 2,
         'param_dim': 2,
-        'latent_dim': 32,
+        'latent_dim': 256,
         'out_dim': 3,
     }
     model = MeshBaseline(**model_cfg)
 
     trainer_cfg = {
-        'gpus': [0],
+        'max_epochs': 1000,
+        'gpus': [14],
         'check_val_every_n_epoch': 10,
         'auto_lr_find': False,
     }
     trainer = pl.Trainer(**trainer_cfg)
-    if trainer_cfg['auto_lr_find']:
-        lr_finder = trainer.tuner.lr_find(model, data_module)
-        # Plot with
-        fig = lr_finder.plot(suggest=True)
-        fig.show()
-        # Pick point based on plot, or get suggestion
-        new_lr = lr_finder.suggestion()
-        # update hparams of the model
-        model.lr = new_lr
 
     trainer.fit(model, data_module)
