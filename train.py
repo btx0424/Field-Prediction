@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torchvision import transforms
 from utils.plot import plot_fields_quad
 from datasets.structured import StructuredModule
+import yaml
 
 class ConditionalNorm(nn.Module):
     """
@@ -35,10 +36,8 @@ class MeshBaseline(pl.LightningModule):
             ResNeXt(latent_dim, 16),
         )
         self.decoder        = CNNDecoder(
-            method = 'PixelShuffle', groups=4,
+            method = 'bilinear', groups=4,
             in_channels=latent_dim, out_channels=out_dim,)
-        
-        self.lr = 1e-3
 
     def forward(self, batch):
         [x, c], y = batch
@@ -56,7 +55,7 @@ class MeshBaseline(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         out = self.forward(batch)
-        loss = F.mse_loss(out, batch[-1])
+        loss = 10 * F.l1_loss(out, batch[-1]) + F.mse_loss(out, batch[-1])
         self.log('training_loss', loss)
         if batch_idx == 0:
             [x, _], y = batch
@@ -76,7 +75,7 @@ class MeshBaseline(pl.LightningModule):
             'lr_scheduler': scheduler,
             'monitor': 'training_loss',
             'interval': 'step',
-            'frequency': 5,
+            'frequency': 10,
             'strict': True
         }
 
@@ -86,26 +85,16 @@ class MeshBaseline(pl.LightningModule):
         self.logger.experiment.add_figure(f"Epoch {self.current_epoch}", fig)
 
 if __name__=='__main__':
-    data_cfg = {
-        'data_dir': './data/npy',
-        'batch_size': 32,
-    }
-    data_module = StructuredModule(**data_cfg)
 
-    model_cfg = {
-        'geo_dim': 2,
-        'param_dim': 2,
-        'latent_dim': 256,
-        'out_dim': 3,
-    }
-    model = MeshBaseline(**model_cfg)
+    cfg_file = './configs/structured.yaml'
 
-    trainer_cfg = {
-        'max_epochs': 1000,
-        'gpus': [14],
-        'check_val_every_n_epoch': 10,
-        'auto_lr_find': False,
-    }
-    trainer = pl.Trainer(**trainer_cfg)
+    with open(cfg_file, 'r') as f:
+        cfg = yaml.load(f, Loader=yaml.Loader)
+    
+    data_module = StructuredModule(**cfg.get('data'))
+    
+    model = MeshBaseline(**cfg.get('model'))
+
+    trainer = pl.Trainer(gpus=[0], **cfg.get('training'))
 
     trainer.fit(model, data_module)
