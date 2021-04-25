@@ -11,10 +11,10 @@ class Upsample(nn.Module):
             self.blocks = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels*4, kernel_size=3, padding=1, groups=groups),
                 nn.PixelShuffle(2),
-                nn.InstanceNorm2d(out_channels),
+                nn.BatchNorm2d(out_channels),
                 nn.PReLU(out_channels),
                 nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, groups=groups),
-                nn.InstanceNorm2d(out_channels),
+                nn.BatchNorm2d(out_channels),
                 nn.PReLU(out_channels),
             )
         elif method=='bilinear':
@@ -117,7 +117,6 @@ class ResNeXt(nn.Module):
             conv(dim, D*cardinality, 1),
             nn.PReLU(D*cardinality),
             conv(D*cardinality, D*cardinality, 3, padding=1, groups=cardinality),
-            nn.GroupNorm(cardinality, D*cardinality),
             nn.PReLU(D*cardinality),
             conv(D*cardinality, dim, 1),
             nn.PReLU(dim),

@@ -41,6 +41,7 @@ class MeshBaseline(pl.LightningModule):
 
     def forward(self, batch):
         [x, c], y = batch
+        # y = transforms.functional.normalize(y, mean=[0.7, 0.6, -2.7], std=[0.04, 0.2, 5e-6])
         size = x.size()[-2:]
         # transform
         x = transforms.functional.resize(x, [128, 512])
@@ -95,6 +96,6 @@ if __name__=='__main__':
     
     model = MeshBaseline(**cfg.get('model'))
 
-    trainer = pl.Trainer(gpus=[0], **cfg.get('training'))
+    trainer = pl.Trainer(gpus=[4], **cfg.get('training'))
 
     trainer.fit(model, data_module)

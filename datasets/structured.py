@@ -11,8 +11,8 @@ class Structured(Dataset):
 
     def __init__(self, file_list, **kwargs):
         
-        self.x_dim = kwargs.get('x_dim', [0, 1])
-        self.y_dim = kwargs.get('y_dim', [3, 4, 7])
+        self.x_dim = kwargs.get('x_dim', [0, 1]) # x, y
+        self.y_dim = kwargs.get('y_dim', [5, 6, 7]) # u, v, p
 
         self.file_list = [(file_name, *Structured.parse_name(file_name)) for file_name in file_list]
 
