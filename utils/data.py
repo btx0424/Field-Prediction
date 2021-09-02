@@ -1,6 +1,5 @@
 import numpy as np
 
-
 """
 These are fuctions for processing data in the format of structured mesh.
 """
@@ -87,3 +86,84 @@ def convert_to_np(data_dir: str, output_dir: str):
                 mach = float(settings.get('AUXDATA Common.ReferenceMachNumber').strip('"'))
                 target = os.path.join(output_dir, filename.replace('deg.dat',f'_{mach}'))
                 np.save(target, Z)
+
+def process_zones(filename: str):
+    with open(filename, 'r') as f:
+        zones = []
+        for line in f:
+            if line.startswith('ZONE'):
+                settings = {}
+                while True:
+                    line = f.readline().strip()
+                    if line.startswith("DT"): break
+                    for pair in line.replace('\n', '').split(','):
+                        k, v = pair.split('=')
+                        settings[k.strip()] = v.strip()
+                I, J, K = int(settings['I']), int(settings['J']), int(settings['K'])
+                zone = []
+                for _ in range(I * J * K):
+                    zone.append([float(x) for x in f.readline().strip().split(' ')])
+                zone = np.array(zone)
+                zones.append(zone.reshape(K, J, I, zone.shape[-1]))
+        Z = concat_zones(zones)
+        aoa = float(settings.get('AUXDATA Common.AngleOfAttack').strip('"'))
+        mach = float(settings.get('AUXDATA Common.ReferenceMachNumber').strip('"'))
+        np.save(filename.replace('deg.dat',f'_{mach}'), Z)
+    return Z, zones
+
+def generate_mesh(contour, save_path, visualize=False):
+    """
+    This function generates mesh for an airfoil from specified options.
+    TODO: add more options and finer control.
+    """
+    import gmsh
+    gmsh.initialize()
+    gmsh.model.add('new model')
+    lc = 0.002
+    
+    airfoil_points = []
+    for point in contour:
+        x, y = point
+        airfoil_points.append(gmsh.model.geo.add_point(x, y, 0, lc))
+    airfoil_points.append(airfoil_points[0])
+    
+    top = gmsh.model.geo.add_point(0, 10, 0, 500*lc)
+    center = gmsh.model.geo.add_point(0, 0, 0, 500*lc)
+    bottom = gmsh.model.geo.add_point(0, -10, 0, 500*lc)
+    arc = gmsh.model.geo.add_circle_arc(top, center, bottom)
+
+    top_right = gmsh.model.geo.add_point(10, 10, 0, 1000*lc)
+    bottom_right = gmsh.model.geo.add_point(10, -10, 0, 1000*lc)
+    rec = gmsh.model.geo.add_polyline([top, top_right, bottom_right, bottom])
+    
+    airfoil = gmsh.model.geo.add_spline(airfoil_points)
+    
+    surface = gmsh.model.geo.add_plane_surface([
+        gmsh.model.geo.add_curve_loop([arc, -rec]), # farfield
+        gmsh.model.geo.add_curve_loop([airfoil]) 
+    ])
+    gmsh.model.geo.synchronize()
+
+    airfoil_tag = gmsh.model.add_physical_group(1, [airfoil])
+    gmsh.model.set_physical_name(1, airfoil_tag, 'airfoil')
+    farfield_tag = gmsh.model.add_physical_group(1, [arc, -rec])
+    gmsh.model.set_physical_name(1, farfield_tag, 'farfield')
+    surface_tag = gmsh.model.add_physical_group(2, [surface])
+    gmsh.model.set_physical_name(2, surface_tag, 'surface')
+
+    gmsh.model.mesh.generate(2)
+    gmsh.write(save_path)
+
+    if visualize:
+        gmsh.fltk.run()
+    gmsh.finalize()
+
+def read_dat(file_name):
+    profile = []
+    with open(file_name, 'r') as f:
+        for line in f.readlines():
+            if not line.startswith('#'):
+                x, y = line.strip().split()
+                profile.append((float(x), float(y)))
+    return profile
+
