@@ -53,7 +53,7 @@ def plot_fields_quad(X:np.ndarray, fields: np.ndarray, show=False, **kwargs):
         # axes[i, j].contour(xcoord, ycoord, uvp, levels=20, linestyles='-', linewidths=0.4, colors='k')
         axes[i, j].pcolormesh(xcoord, ycoord, fields[i, j], cmap='jet', shading='gouraud', antialiased=True, snap=True, rasterized=True)
         axes[i, j].set_xlim(xlim)
-        axes[i, j].set_ylim(ylim)    
+        axes[i, j].set_ylim(ylim)
     
     if xlabels:
         for j in range(ncols):

@@ -99,16 +99,18 @@ def process_zones(filename: str):
                     for pair in line.replace('\n', '').split(','):
                         k, v = pair.split('=')
                         settings[k.strip()] = v.strip()
-                I, J, K = int(settings['I']), int(settings['J']), int(settings['K'])
+                # I, J, K = int(settings['I']), int(settings['J']), int(settings['K'])
+                I, K = int(settings['I']),  int(settings['K'])
+
                 zone = []
-                for _ in range(I * J * K):
+                for _ in range(I * K):
                     zone.append([float(x) for x in f.readline().strip().split(' ')])
                 zone = np.array(zone)
-                zones.append(zone.reshape(K, J, I, zone.shape[-1]))
+                zones.append(zone.reshape(K, I, zone.shape[-1]))
         Z = concat_zones(zones)
         aoa = float(settings.get('AUXDATA Common.AngleOfAttack').strip('"'))
         mach = float(settings.get('AUXDATA Common.ReferenceMachNumber').strip('"'))
-        np.save(filename.replace('deg.dat',f'_{mach}'), Z)
+        # np.save(filename.replace('deg.dat',f'_{mach}'), Z)
     return Z, zones
 
 def generate_mesh(contour, save_path, visualize=False):
